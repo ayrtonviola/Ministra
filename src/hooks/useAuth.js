@@ -3,14 +3,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 
-// ... (restante do código)
-
 const useAuth = (toast) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [allRegisteredUsers, setAllRegisteredUsers] = useState([]);
-  const [isLoading, setIsLoading] = useState(true); // <-- Estado inicial
-
-  console.log('useAuth: Estado inicial de isLoading:', isLoading); // ADICIONE AQUI
+  const [isLoading, setIsLoading] = useState(true);
 
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
   const [authMode, setAuthMode] = useState('login');
@@ -18,8 +14,8 @@ const useAuth = (toast) => {
   const [isUserTypeDialogOpen, setIsUserTypeDialogOpen] = useState(false);
   const [isLeaderPasswordDialogOpen, setIsLeaderPasswordDialogOpen] = useState(false);
 
+  // Busca perfil no supabase
   const fetchUserProfile = useCallback(async (userId, email) => {
-    console.log('fetchUserProfile: Buscando perfil para userId:', userId, 'email:', email); // ADICIONE AQUI
     const { data: profile, error } = await supabase
       .from('profiles')
       .select('*')
@@ -27,64 +23,50 @@ const useAuth = (toast) => {
       .single();
 
     if (error && error.code !== 'PGRST116') {
-      console.error("fetchUserProfile: Erro ao buscar perfil:", error); // ADICIONE AQUI
-      toast({ title: "Erro", description: "Não foi possível carregar seu perfil de usuário.", variant: "destructive" });
+      toast({ title: "Erro", description: "Não foi possível carregar seu perfil.", variant: "destructive" });
       return null;
     }
 
     if (!profile) {
-      console.log("fetchUserProfile: Perfil não encontrado para o usuário:", userId, "Retornando estrutura básica."); // ADICIONE AQUI
-      return { id: userId, email: email, username: null, full_name: null, type: null };
+      return { id: userId, email, username: null, full_name: null, type: null };
     }
 
-    console.log("fetchUserProfile: Perfil carregado:", profile); // ADICIONE AQUI
     return profile;
   }, [toast]);
 
+  // Listener de autenticação
   useEffect(() => {
-    console.log('useEffect: Iniciando listener de autenticação e verificação inicial.'); // ADICIONE AQUI
-
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log("onAuthStateChange: Evento de autenticação:", event, "Sessão:", session); // ADICIONE AQUI
         setIsLoading(true);
-        console.log("onAuthStateChange: setIsLoading(true)"); // ADICIONE AQUI
 
         if (session) {
           const user = session.user;
           const profile = await fetchUserProfile(user.id, user.email);
           const userWithProfile = { ...user, ...profile };
           setCurrentUser(userWithProfile);
-          console.log("onAuthStateChange: currentUser definido como:", userWithProfile); // ADICIONE AQUI
 
           if (profile && !profile.type) {
             setIsUserTypeDialogOpen(true);
-            console.log("onAuthStateChange: isUserTypeDialogOpen definido como TRUE (perfil sem tipo)."); // ADICIONE AQUI
           } else {
             setIsUserTypeDialogOpen(false);
-            console.log("onAuthStateChange: isUserTypeDialogOpen definido como FALSE (perfil já tem tipo ou não encontrado)."); // ADICIONE AQUI
           }
-
         } else {
           setCurrentUser(null);
           setIsAuthDialogOpen(true);
           setIsUserTypeDialogOpen(false);
-          console.log("onAuthStateChange: Nenhuma sessão, isAuthDialogOpen TRUE, isUserTypeDialogOpen FALSE."); // ADICIONE AQUI
         }
+
         setIsLoading(false);
-        console.log("onAuthStateChange: setIsLoading(false)"); // ADICIONE AQUI
       }
     );
 
     const checkInitialSession = async () => {
-      console.log('checkInitialSession: Verificando sessão inicial.'); // ADICIONE AQUI
       setIsLoading(true);
-      console.log("checkInitialSession: setIsLoading(true)"); // ADICIONE AQUI
 
       const { data: { session }, error } = await supabase.auth.getSession();
 
       if (error) {
-        console.error("checkInitialSession: Erro ao obter sessão inicial:", error); // ADICIONE AQUI
         toast({ title: "Erro de Sessão", description: error.message, variant: "destructive" });
         setCurrentUser(null);
         setIsAuthDialogOpen(true);
@@ -93,22 +75,17 @@ const useAuth = (toast) => {
         const profile = await fetchUserProfile(user.id, user.email);
         const userWithProfile = { ...user, ...profile };
         setCurrentUser(userWithProfile);
-        console.log("checkInitialSession: currentUser definido como:", userWithProfile); // ADICIONE AQUI
 
         if (profile && !profile.type) {
           setIsUserTypeDialogOpen(true);
-          console.log("checkInitialSession: isUserTypeDialogOpen definido como TRUE (perfil sem tipo)."); // ADICIONE AQUI
         } else {
           setIsUserTypeDialogOpen(false);
-          console.log("checkInitialSession: isUserTypeDialogOpen definido como FALSE (perfil já tem tipo ou não encontrado)."); // ADICIONE AQUI
         }
-
       } else {
         setCurrentUser(null);
         setIsAuthDialogOpen(true);
       }
       setIsLoading(false);
-      console.log("checkInitialSession: setIsLoading(false)"); // ADICIONE AQUI
     };
 
     checkInitialSession();
@@ -118,32 +95,135 @@ const useAuth = (toast) => {
     };
   }, [fetchUserProfile, toast]);
 
-  // ... (restante do código, como handleRegister, handleLogin, etc.)
+  // Cadastro
+  const handleRegister = useCallback(
+    async (email, password, username) => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase.auth.signUp({ email, password });
 
-  // NO handleUserTypeSelection, adicione logs também
-  const handleUserTypeSelection = useCallback(async (type, username, fullName) => {
+        if (error) {
+          toast({ title: "Erro no cadastro", description: error.message, variant: "destructive" });
+          return;
+        }
+
+        if (data?.user) {
+          const userId = data.user.id;
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert([{ id: userId, email, username }]);
+
+          if (profileError) {
+            toast({ title: "Erro ao salvar perfil", description: profileError.message, variant: "destructive" });
+            return;
+          }
+
+          toast({ title: "Cadastro realizado", description: "Você pode fazer login agora.", variant: "success" });
+
+          setAuthMode('login');
+          setIsAuthDialogOpen(true);
+        }
+      } catch (err) {
+        toast({ title: "Erro inesperado", description: err.message || "Erro desconhecido", variant: "destructive" });
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [toast, setAuthMode, setIsAuthDialogOpen]
+  );
+
+  // Login
+  const handleLogin = useCallback(
+    async (email, password) => {
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+        if (error) {
+          toast({ title: "Erro no login", description: error.message, variant: "destructive" });
+          return;
+        }
+
+        if (data?.user) {
+          const profile = await fetchUserProfile(data.user.id, data.user.email);
+          const userWithProfile = { ...data.user, ...profile };
+          setCurrentUser(userWithProfile);
+          setIsAuthDialogOpen(false);
+        }
+      } catch (err) {
+        toast({ title: "Erro inesperado", description: err.message || "Erro desconhecido", variant: "destructive" });
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [toast, fetchUserProfile, setIsAuthDialogOpen]
+  );
+
+  // Logout
+  const handleLogout = useCallback(async () => {
     setIsLoading(true);
-    console.log("handleUserTypeSelection: setIsLoading(true) - Salvando tipo:", type); // ADICIONE AQUI
-    if (!currentUser) {
-      console.error("handleUserTypeSelection: Nenhum usuário logado para atualizar."); // ADICIONE AQUI
-      toast({ title: "Erro", description: "Nenhum usuário logado para atualizar.", variant: "destructive" });
-      setIsLoading(false);
-      return;
-    }
-
-    // ... (restante do código)
-
     try {
-      // ...
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        toast({ title: "Erro no logout", description: error.message, variant: "destructive" });
+      } else {
+        setCurrentUser(null);
+        setIsAuthDialogOpen(true);
+      }
     } catch (err) {
-      console.error("handleUserTypeSelection: Erro inesperado ao salvar perfil:", err); // ADICIONE AQUI
-      // ...
+      toast({ title: "Erro inesperado", description: err.message || "Erro desconhecido", variant: "destructive" });
     } finally {
       setIsLoading(false);
-      console.log("handleUserTypeSelection: setIsLoading(false) - Finalizado."); // ADICIONE AQUI
     }
-  }, [currentUser, toast]);
+  }, [toast, setIsAuthDialogOpen]);
 
+  // Switch User (placeholder, ajuste conforme sua lógica)
+  const handleSwitchUser = useCallback(() => {
+    // Lógica para troca de usuário
+  }, []);
+
+  // Seleção de tipo do usuário
+  const handleUserTypeSelection = useCallback(
+    async (type, username, fullName) => {
+      setIsLoading(true);
+      if (!currentUser) {
+        toast({ title: "Erro", description: "Nenhum usuário logado para atualizar.", variant: "destructive" });
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const updates = {
+          id: currentUser.id,
+          type,
+          username,
+          full_name: fullName,
+          updated_at: new Date(),
+        };
+
+        const { error } = await supabase.from('profiles').upsert(updates);
+
+        if (error) {
+          toast({ title: "Erro ao atualizar perfil", description: error.message, variant: "destructive" });
+          return;
+        }
+
+        setCurrentUser((prev) => ({ ...prev, type, username, full_name: fullName }));
+        setIsUserTypeDialogOpen(false);
+        toast({ title: "Perfil atualizado", variant: "success" });
+      } catch (err) {
+        toast({ title: "Erro inesperado", description: err.message || "Erro desconhecido", variant: "destructive" });
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [currentUser, toast]
+  );
+
+  // Confirmação da senha do líder (placeholder)
+  const handleLeaderPasswordConfirm = useCallback(() => {
+    // Sua lógica aqui
+  }, []);
 
   return {
     currentUser,

@@ -125,7 +125,7 @@ const ScheduleModule = ({ currentUser, registeredUsers }) => {
         onSave={handleSaveSchedule}
         isEditMode={isEditMode}
         allSongs={allSongs}
-        allUsers={registeredUsers} 
+        allUsers={registeredUsers || []} 
       />
     </div>
   );

@@ -1,0 +1,123 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Default to dark mode values, inspired by Threads (very dark gray/black) */
+    --background: 220 10% 3%; /* Very dark, almost black */
+    --foreground: 210 20% 90%; /* Light gray for text */
+
+    --card: 220 10% 5%; /* Slightly lighter black for cards */
+    --card-foreground: 210 20% 90%;
+
+    --popover: 220 10% 2%; /* Even darker for popovers */
+    --popover-foreground: 210 20% 90%;
+
+    --primary: 210 100% 60%; /* A subtle blue for primary actions, can be adjusted */
+    --primary-foreground: 220 20% 10%; /* Dark text on primary buttons */
+
+    --secondary: 220 10% 10%; /* Dark gray for secondary elements */
+    --secondary-foreground: 210 20% 80%;
+
+    --muted: 220 10% 10%; /* Similar to secondary for muted elements */
+    --muted-foreground: 210 20% 50%; /* Dimmer text for muted */
+
+    --accent: 220 10% 15%; /* Darker gray for accents */
+    --accent-foreground: 210 20% 90%;
+
+    --destructive: 0 70% 50%; /* A standard red for destructive actions */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 10% 12%; /* Subtle border color */
+    --input: 220 10% 12%; /* Input background */
+    --ring: 210 100% 60%; /* Ring color, matches primary */
+
+    --radius: 0.5rem;
+  }
+ 
+  .dark {
+    /* Ensure .dark class explicitly uses these values if needed, but defaults are already dark */
+    --background: 220 10% 3%;
+    --foreground: 210 20% 90%;
+    --card: 220 10% 5%;
+    --card-foreground: 210 20% 90%;
+    --popover: 220 10% 2%;
+    --popover-foreground: 210 20% 90%;
+    --primary: 210 100% 60%;
+    --primary-foreground: 220 20% 10%;
+    --secondary: 220 10% 10%;
+    --secondary-foreground: 210 20% 80%;
+    --muted: 220 10% 10%;
+    --muted-foreground: 210 20% 50%;
+    --accent: 220 10% 15%;
+    --accent-foreground: 210 20% 90%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 10% 12%;
+    --input: 220 10% 12%;
+    --ring: 210 100% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  /* Ensure HTML is also dark by default */
+  html {
+    @apply dark;
+  }
+}
+
+.drumpad-button {
+  @apply relative overflow-hidden transition-all duration-300 transform hover:scale-105 active:scale-95;
+}
+
+.drumpad-button::before {
+  content: '';
+  @apply absolute inset-0 bg-white opacity-0 transition-opacity duration-300;
+}
+
+.drumpad-button.active::before {
+  @apply opacity-20; /* Reduced opacity for darker theme */
+}
+
+.drumpad-button:active::before {
+  @apply opacity-20; /* Reduced opacity for darker theme */
+}
+
+.glass-effect {
+  /* Adjusted for black theme - more subtle blur, darker base */
+  @apply bg-black/30 backdrop-blur-lg border border-gray-700/50;
+}
+
+/* General components adjustments for black theme */
+.button-primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90;
+}
+.button-secondary {
+    @apply bg-secondary text-secondary-foreground hover:bg-secondary/80;
+}
+.input-custom {
+    @apply bg-input text-foreground placeholder:text-muted-foreground border-border;
+}
+.card-custom {
+    @apply bg-card text-card-foreground border-border;
+}
+.dialog-custom {
+    @apply bg-popover text-popover-foreground border-border;
+}
+.header-custom {
+    @apply bg-background/80 backdrop-blur-md shadow-lg; /* Using background with opacity for a slight depth */
+}
+.tabs-list-custom {
+    @apply bg-secondary rounded-md p-1;
+}
+.tabs-trigger-custom {
+    @apply text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm;
+}

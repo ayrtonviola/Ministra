@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabaseClient'; // Ajuste o caminho se necessá
 
 const useAuth = (toast) => {
   const [currentUser, setCurrentUser] = useState(null);
-  const [allRegisteredUsers, setAllRegisteredUsers] = useState([]); // Ainda não vejo onde isso é populado
+  const [allRegisteredUsers, setAllRegisteredUsers] = useState([]); // A ser populado em algum lugar
   const [isLoading, setIsLoading] = useState(true);
 
   const [isAuthDialogOpen, setIsAuthDialogOpen] = useState(false);
@@ -14,7 +14,7 @@ const useAuth = (toast) => {
   const [isUserTypeDialogOpen, setIsUserTypeDialogOpen] = useState(false);
   const [isLeaderPasswordDialogOpen, setIsLeaderPasswordDialogOpen] = useState(false);
 
-  // Busca perfil no supabase - SEM MUDANÇAS AQUI
+  // Busca perfil no supabase
   const fetchUserProfile = useCallback(async (userId, email) => {
     const { data: profile, error } = await supabase
       .from('profiles')
@@ -23,12 +23,14 @@ const useAuth = (toast) => {
       .single();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 é 'No Rows In Results', que significa que o perfil não existe ainda
+      console.error("Erro ao carregar perfil:", error.message);
       toast({ title: "Erro", description: "Não foi possível carregar seu perfil.", variant: "destructive" });
       return null;
     }
 
     if (!profile) {
       // Retorna um objeto base para um novo usuário sem perfil ainda
+      // Isso é importante para que o currentUser não seja null após o login, mesmo sem perfil
       return { id: userId, email, username: null, full_name: null, type: null };
     }
 
@@ -37,9 +39,9 @@ const useAuth = (toast) => {
 
   // Efeito para verificar a sessão inicial e configurar o listener de autenticação
   useEffect(() => {
-    // Função assíncrona para verificar a sessão inicial
+    // 1. Função assíncrona para verificar a sessão inicial (rodada uma vez na montagem)
     const checkAndSetSession = async () => {
-      setIsLoading(true); // Inicia carregamento ao verificar a sessão
+      setIsLoading(true); // Inicia carregamento para a verificação inicial
 
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -71,15 +73,18 @@ const useAuth = (toast) => {
         setCurrentUser(null);
         setIsAuthDialogOpen(true);
       } finally {
-        setIsLoading(false); // SEMPRE define isLoading como false ao final
+        setIsLoading(false); // SEMPRE define isLoading como false ao final da verificação inicial
       }
     };
 
-    // Adiciona o listener para futuras mudanças de estado de autenticação
-    const { data: authListener } = supabase.auth.onAuthStateChange(
+    // 2. Adiciona o listener para futuras mudanças de estado de autenticação (eventos como login, logout, etc.)
+    // A destruturação aqui está correta para pegar o 'subscription'
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        // Ao invés de setIsLoading(true) a cada evento, reagimos ao novo estado.
-        // O `isLoading` já foi definido pela `checkAndSetSession`.
+        // Esta callback é acionada por eventos. O `isLoading` deve ser gerenciado para cada evento.
+        // Se um evento ocorre, geralmente estamos esperando alguma ação.
+        setIsLoading(true); // Setar isLoading para true para o processamento do evento
+
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
           if (session) {
             const user = session.user;
@@ -98,26 +103,33 @@ const useAuth = (toast) => {
           setCurrentUser(null);
           setIsAuthDialogOpen(true); // Abre diálogo de auth após logout
           setIsUserTypeDialogOpen(false); // Garante que o diálogo de tipo está fechado
+          toast({ title: "Você saiu com sucesso!", variant: "success" }); // Mensagem de logout aqui
         }
-        // Não precisamos setar isLoading(false) aqui, pois o initial check já cuida disso
-        // e o App.jsx já gerencia o loading baseado no estado de `currentUser` e `isAuthDialogOpen`
+        setIsLoading(false); // Define isLoading como false após o evento ser processado
       }
     );
 
-    // Chama a função para verificar a sessão inicial uma vez
+    // Chama a função para verificar a sessão inicial uma vez na montagem do componente
     checkAndSetSession();
 
     // Retorna a função de limpeza para o listener
     return () => {
-      authListener.subscription.unsubscribe();
+      // Isso está correto para desinscrever o listener de autenticação
+      if (authSubscription) {
+        authSubscription.unsubscribe();
+      }
     };
-  }, [fetchUserProfile, toast]); // Adicione fetchUserProfile como dependência
+  }, [fetchUserProfile, toast]); // fetchUserProfile é uma dependência correta aqui
 
-  // Cadastro - SEM MUDANÇAS RELEVANTES, APENAS REMOÇÃO DO setIsLoading(true/false) interno
+  // Funções de Autenticação (handleRegister, handleLogin, handleLogout, handleUserTypeSelection)
+  // Removi os setIsLoading internos e confiei no fluxo do useEffect principal para o loading.
+  // No entanto, para ações diretas (botões), um setIsLoading(true/false) É RECOMENDADO
+  // no `try...finally` de cada uma dessas funções, pois elas são chamadas por interação do usuário.
+
+  // Re-adicionando setIsLoading nos handlers para melhor UX
   const handleRegister = useCallback(
     async (email, password, username) => {
-      // Não manipule setIsLoading aqui, a chamada inicial já cobre o loading
-      // O `App.jsx` já mostra o loader
+      setIsLoading(true); // Inicia loading para a operação de registro
       try {
         const { data, error } = await supabase.auth.signUp({ email, password });
 
@@ -138,21 +150,21 @@ const useAuth = (toast) => {
           }
 
           toast({ title: "Cadastro realizado", description: "Você pode fazer login agora.", variant: "success" });
-
           setAuthMode('login');
           setIsAuthDialogOpen(true);
         }
       } catch (err) {
         toast({ title: "Erro inesperado", description: err.message || "Erro desconhecido", variant: "destructive" });
+      } finally {
+        setIsLoading(false); // Finaliza loading
       }
     },
     [toast, setAuthMode, setIsAuthDialogOpen]
   );
 
-  // Login - SEM MUDANÇAS RELEVANTES, APENAS REMOÇÃO DO setIsLoading(true/false) interno
   const handleLogin = useCallback(
     async (email, password) => {
-      // Não manipule setIsLoading aqui, a chamada inicial já cobre o loading
+      setIsLoading(true); // Inicia loading para a operação de login
       try {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
@@ -166,43 +178,43 @@ const useAuth = (toast) => {
           const userWithProfile = { ...data.user, ...profile };
           setCurrentUser(userWithProfile);
           setIsAuthDialogOpen(false); // Fecha o modal de autenticação após login
-          // A lógica de isUserTypeDialogOpen será acionada pelo onAuthStateChange ou pelo useEffect principal
         }
       } catch (err) {
         toast({ title: "Erro inesperado", description: err.message || "Erro desconhecido", variant: "destructive" });
+      } finally {
+        setIsLoading(false); // Finaliza loading
       }
     },
     [toast, fetchUserProfile, setIsAuthDialogOpen]
   );
 
-  // Logout - SEM MUDANÇAS RELEVANTES, APENAS REMOÇÃO DO setIsLoading(true/false) interno
   const handleLogout = useCallback(async () => {
-    // Não manipule setIsLoading aqui
+    setIsLoading(true); // Inicia loading para a operação de logout
     try {
       const { error } = await supabase.auth.signOut();
       if (error) {
         toast({ title: "Erro no logout", description: error.message, variant: "destructive" });
       } else {
-        // o onAuthStateChange com 'SIGNED_OUT' vai cuidar de setCurrentUser(null) e setIsAuthDialogOpen(true)
-        toast({ title: "Você saiu com sucesso!", variant: "success" });
+        // O onAuthStateChange com 'SIGNED_OUT' vai cuidar de setCurrentUser(null) e setIsAuthDialogOpen(true)
+        // A mensagem de toast para logout já está lá no listener do useEffect.
       }
     } catch (err) {
       toast({ title: "Erro inesperado", description: err.message || "Erro desconhecido", variant: "destructive" });
+    } finally {
+      setIsLoading(false); // Finaliza loading
     }
-  }, [toast]);
+  }, [toast]); // Não precisa de setIsAuthDialogOpen aqui, o listener cuida
 
-  // Switch User (placeholder, ajuste conforme sua lógica)
   const handleSwitchUser = useCallback(() => {
-    // Lógica para troca de usuário
     toast({ title: "Funcionalidade de troca de usuário", description: "Esta função ainda não foi implementada.", variant: "info" });
   }, [toast]);
 
-  // Seleção de tipo do usuário - SEM MUDANÇAS RELEVANTES, APENAS REMOÇÃO DO setIsLoading(true/false) interno
   const handleUserTypeSelection = useCallback(
     async (type, username, fullName) => {
-      // Não manipule setIsLoading aqui
+      setIsLoading(true); // Inicia loading para a operação de seleção de tipo
       if (!currentUser) {
         toast({ title: "Erro", description: "Nenhum usuário logado para atualizar.", variant: "destructive" });
+        setIsLoading(false);
         return;
       }
 
@@ -219,30 +231,29 @@ const useAuth = (toast) => {
 
         if (error) {
           toast({ title: "Erro ao atualizar perfil", description: error.message, variant: "destructive" });
-          return;
+          return; // Não finaliza loading aqui, o finally fará isso
         }
 
-        // Atualiza o currentUser no estado do hook para refletir as mudanças
         setCurrentUser((prev) => ({ ...prev, type, username, full_name: fullName }));
-        setIsUserTypeDialogOpen(false); // Fecha o modal de tipo
+        setIsUserTypeDialogOpen(false);
         toast({ title: "Perfil atualizado", variant: "success" });
       } catch (err) {
         toast({ title: "Erro inesperado", description: err.message || "Erro desconhecido", variant: "destructive" });
+      } finally {
+        setIsLoading(false); // Finaliza loading
       }
     },
     [currentUser, toast]
   );
 
-  // Confirmação da senha do líder (placeholder)
   const handleLeaderPasswordConfirm = useCallback(() => {
-    // Sua lógica aqui
     toast({ title: "Confirmação de senha do líder", description: "Esta função ainda não foi implementada.", variant: "info" });
   }, [toast]);
 
   return {
     currentUser,
     allRegisteredUsers,
-    isLoading, // Este isLoading agora deve funcionar de forma mais consistente
+    isLoading,
     isAuthDialogOpen,
     authMode,
     isUserTypeDialogOpen,
@@ -257,7 +268,7 @@ const useAuth = (toast) => {
     setAuthMode,
     setIsUserTypeDialogOpen,
     setIsLeaderPasswordDialogOpen,
-    setAllRegisteredUsers // Ainda não vejo onde isso é usado/populado
+    setAllRegisteredUsers
   };
 };
 

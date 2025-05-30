@@ -1,4 +1,3 @@
-// src/contexts/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabaseClient'; // Ajuste o caminho se necessário
 import { useNavigate, useLocation } from 'react-router-dom'; // Importe do react-router-dom
@@ -82,7 +81,7 @@ export function AuthProvider({ children }) {
 
       // Função de limpeza para o listener
       return () => {
-        authListener?.unsubscribe();
+        authListener?.subscription?.unsubscribe();
       };
     };
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -122,11 +121,105 @@ const ScheduleDialog = ({ isOpen, onOpenChange, schedule, onSave, isEditMode, al
       <DialogContent className="bg-background text-foreground border-border max-w-2xl">
         <DialogHeader>
           <DialogTitle>{isEditMode ? 'Editar Escala' : 'Nova Escala'}</DialogTitle>
+          <p className="text-sm text-muted-foreground">Preencha os dados da escala e salve.</p>
         </DialogHeader>
-        ...
-      </DialogContent>
-    </Dialog>
-  );
-};
 
-export default ScheduleDialog;
+        {/* Título */}
+        <div className="space-y-4 py-4">
+          <div>
+            <Label htmlFor="title">Título</Label>
+            <Input
+              id="title"
+              value={currentSchedule.title}
+              onChange={(e) => setCurrentSchedule({ ...currentSchedule, title: e.target.value })}
+              placeholder="Culto de domingo"
+            />
+          </div>
+
+          {/* Participantes */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Cantores</Label>
+              <div className="flex flex-wrap gap-2">
+                {availableSingers.map((user) => (
+                  <Button
+                    key={user.name}
+                    variant={selectedSingers.includes(user.name) ? "default" : "outline"}
+                    onClick={() => handleParticipantSelection(user.name, 'singer')}
+                    size="sm"
+                  >
+                    <Users className="mr-1 h-4 w-4" />
+                    {user.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label>Instrumentistas</Label>
+              <div className="flex flex-wrap gap-2">
+                {availableInstrumentalists.map((user) => (
+                  <Button
+                    key={user.name}
+                    variant={selectedInstrumentalists.includes(user.name) ? "default" : "outline"}
+                    onClick={() => handleParticipantSelection(user.name, 'instrumentalist')}
+                    size="sm"
+                  >
+                    <Users className="mr-1 h-4 w-4" />
+                    {user.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Músicas */}
+          <div>
+            <Label>Músicas</Label>
+            <div className="flex gap-2 mb-2">
+              <Input
+                placeholder="Nova música"
+                value={newSongTitle}
+                onChange={(e) => setNewSongTitle(e.target.value)}
+              />
+              <Button onClick={handleAddSongToSchedule}>
+                <Plus className="w-4 h-4 mr-1" /> Adicionar
+              </Button>
+            </div>
+
+            {/* Lista de músicas selecionadas */}
+            {selectedSongs.map((song, idx) => (
+              <div key={idx} className="flex items-center justify-between border rounded px-3 py-2 mb-2">
+                <div>
+                  <div className="font-semibold">{song.title}</div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="mt-1">
+                        Tom: {song.key || 'Selecionar'} <ChevronDown className="ml-2 w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      {musicKeys.map((key) => (
+                        <DropdownMenuItem key={key} onClick={() => handleSongKeyChange(song.title, key)}>
+                          {key}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                <Button variant="ghost" onClick={() => handleRemoveSongFromSchedule(song.title)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            ))}
+
+            {/* Músicas existentes para seleção rápida */}
+            {allSongs?.length > 0 && (
+              <div className="mt-2">
+                <Label className="block mb-1">Músicas disponíveis</Label>
+                <div className="flex flex-wrap gap-2">
+                  {allSongs.map((song) => (
+                    <Button
+                      key={song.title}
+                      size="sm"
+                      variant={selectedSongs.find(s => s.title === song.title) ? "default" : "outline"}
+                     

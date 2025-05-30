@@ -1,3 +1,4 @@
+// src/components/auth/UserTypeDialog.jsx
 
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -20,12 +21,14 @@ const userTypes = [
 const UserTypeDialog = ({ isOpen, onOpenChange, username, onSelectType }) => {
   const [selectedUserType, setSelectedUserType] = useState('');
 
-  const handleContinue = () => {
-    onSelectType(selectedUserType);
-    setSelectedUserType(''); 
+  const handleContinue = async () => { // Tornar async para esperar onSelectType
+    await onSelectType(selectedUserType);
+    setSelectedUserType('');
+    // onOpenChange(false); // A dialog será fechada pelo useEffect do useAuth
   };
 
   return (
+    // Use 'open' e 'onOpenChange' corretamente
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="bg-gray-800 border-gray-700 text-white">
         <DialogHeader>

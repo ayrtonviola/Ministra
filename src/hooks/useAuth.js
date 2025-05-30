@@ -18,7 +18,7 @@ const useAuth = (toast) => {
   const fetchUserProfile = useCallback(async (userId, email) => {
     const { data: profile, error } = await supabase
       .from('profiles')
-      .select('id, username, full_name, email, type, updated_at')  // Só colunas existentes
+      .select('id, username, full_name, email, type, updated_at, website')  // Adicionando a coluna 'website'
       .eq('id', userId)
       .single();
 
@@ -30,8 +30,7 @@ const useAuth = (toast) => {
 
     if (!profile) {
       // Retorna um objeto base para um novo usuário sem perfil ainda
-      // Isso evita que currentUser seja null após o login, mesmo sem perfil
-      return { id: userId, email, username: null, full_name: null, type: null };
+      return { id: userId, email, username: null, full_name: null, type: null, website: null };  // Incluindo 'website' aqui também
     }
 
     return profile;

@@ -206,30 +206,28 @@ const ScheduleDialog = ({ isOpen, onOpenChange, schedule, onSave, isEditMode, al
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-                <Button variant="ghost" onClick={() => handleRemoveSongFromSchedule(song.title)}>
+                <Button variant="destructive" onClick={() => handleRemoveSongFromSchedule(song.title)}>
                   <X className="w-4 h-4" />
                 </Button>
               </div>
             ))}
+          </div>
 
-            {/* Músicas existentes para seleção rápida */}
-            {allSongs?.length > 0 && (
-              <div className="mt-2">
-                <Label className="block mb-1">Músicas disponíveis</Label>
-                <div className="flex flex-wrap gap-2">
-                  {allSongs.map((song) => (
-                    <Button
-                      key={song.title}
-                      variant={selectedSongs.find(s => s.title === song.title) ? "default" : "outline"}
-                      onClick={() => handleSelectExistingSong(song.title)}
-                      size="sm"
-                    >
-                      {song.title}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
+          {/* Lista de músicas existentes */}
+          <div>
+            <Label>Músicas Existentes</Label>
+            <div className="space-y-2">
+              {allSongs.map((song) => (
+                <Button
+                  key={song.title}
+                  variant={selectedSongs.find(s => s.title === song.title) ? "default" : "outline"}
+                  onClick={() => handleSelectExistingSong(song.title)}
+                  size="sm"
+                >
+                  {song.title}
+                </Button>
+              ))}
+            </div>
           </div>
         </div>
 

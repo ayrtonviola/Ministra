@@ -21,7 +21,7 @@ const AuthDialog = ({ isOpen, onOpenChange, authMode, onSwitchAuthMode, onLogin,
   };
 
   const handleSubmit = async () => { // Tornar async para await as chamadas de login/registro
-    const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!emailInput.trim() || !emailRegex.test(emailInput.trim())) {
       toast({ title: "Email Inválido", description: "Por favor, insira um endereço de email válido.", variant: "destructive" });

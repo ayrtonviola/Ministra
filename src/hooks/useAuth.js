@@ -1,4 +1,4 @@
-// src/hooks/useAuth.js (ou useAuthFlow.js)
+// src/hooks/useAuth.js
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient'; // Apenas para o signUp inicial

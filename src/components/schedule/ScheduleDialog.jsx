@@ -220,6 +220,31 @@ const ScheduleDialog = ({ isOpen, onOpenChange, schedule, onSave, isEditMode, al
                   {allSongs.map((song) => (
                     <Button
                       key={song.title}
-                      size="sm"
                       variant={selectedSongs.find(s => s.title === song.title) ? "default" : "outline"}
-                     
+                      onClick={() => handleSelectExistingSong(song.title)}
+                      size="sm"
+                    >
+                      {song.title}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Botões de ação */}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button onClick={handleSave} className="ml-2">
+            <Save className="w-4 h-4 mr-2" /> Salvar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default ScheduleDialog;

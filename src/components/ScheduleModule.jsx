@@ -4,22 +4,32 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import ScheduleList from '@/components/schedule/ScheduleList';
 import ScheduleDialog from '@/components/schedule/ScheduleDialog';
+import { supabase } from '@/lib/supabaseClient';
 
 const ScheduleModule = ({ currentUser, registeredUsers }) => {
   const { toast } = useToast();
   const [schedules, setSchedules] = useState([]);
   const [allSongs, setAllSongs] = useState([]);
-  // const [allUsers, setAllUsers] = useState([]); // Replaced by registeredUsers prop
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [currentScheduleData, setCurrentScheduleData] = useState(null);
 
-  const loadSchedules = useCallback(() => {
-    const savedSchedules = localStorage.getItem('schedules_v2');
-    if (savedSchedules) {
-      setSchedules(JSON.parse(savedSchedules));
+  const loadSchedules = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('schedules')
+      .select('*')
+      .order('date', { ascending: true });
+
+    if (error) {
+      toast({
+        title: 'Erro ao carregar escalas',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      setSchedules(data || []);
     }
-  }, []);
+  }, [toast]);
 
   const loadSongs = useCallback(() => {
     const savedSongs = localStorage.getItem('songs_v2');
@@ -28,26 +38,10 @@ const ScheduleModule = ({ currentUser, registeredUsers }) => {
     }
   }, []);
 
-  // No longer loading users from 'app_users', using registeredUsers prop
-  // const loadUsers = useCallback(() => {
-  //   const savedUsers = localStorage.getItem('app_users'); // This was the old key
-  //   if (savedUsers) {
-  //     setAllUsers(JSON.parse(savedUsers));
-  //   } else {
-  //     // Default users are now handled by UserManagementModule or App.jsx initial load
-  //   }
-  // }, []);
-
-
   useEffect(() => {
     loadSchedules();
     loadSongs();
-    // loadUsers(); // Removed
   }, [loadSchedules, loadSongs]);
-
-  useEffect(() => {
-    localStorage.setItem('schedules_v2', JSON.stringify(schedules));
-  }, [schedules]);
 
   const handleAddSchedule = () => {
     if (currentUser?.type !== 'leader') {
@@ -69,34 +63,49 @@ const ScheduleModule = ({ currentUser, registeredUsers }) => {
     setIsDialogOpen(true);
   };
 
-  const handleDeleteSchedule = (id) => {
+  const handleDeleteSchedule = async (id) => {
     if (currentUser?.type !== 'leader') {
       toast({ title: "Acesso Negado", description: "Apenas líderes podem remover escalas.", variant: "destructive" });
       return;
     }
-    setSchedules(schedules.filter(schedule => schedule.id !== id));
-    toast({
-      title: "Escala removida",
-      description: "A escala foi removida com sucesso.",
-    });
+
+    const { error } = await supabase.from('schedules').delete().eq('id', id);
+    if (error) {
+      toast({ title: "Erro ao remover", description: error.message, variant: "destructive" });
+    } else {
+      setSchedules(schedules.filter(schedule => schedule.id !== id));
+      toast({ title: "Escala removida", description: "A escala foi removida com sucesso." });
+    }
   };
 
-  const handleSaveSchedule = (scheduleData) => {
+  const handleSaveSchedule = async (scheduleData) => {
+    if (currentUser?.type !== 'leader') return;
+
     if (isEditMode) {
-      setSchedules(schedules.map(s =>
-        s.id === scheduleData.id ? scheduleData : s
-      ));
-      toast({
-        title: "Escala atualizada",
-        description: "A escala foi atualizada com sucesso.",
-      });
+      const { error } = await supabase
+        .from('schedules')
+        .update(scheduleData)
+        .eq('id', scheduleData.id);
+
+      if (error) {
+        toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
+      } else {
+        await loadSchedules();
+        toast({ title: "Escala atualizada", description: "A escala foi atualizada com sucesso." });
+      }
     } else {
-      setSchedules([...schedules, { ...scheduleData, id: Date.now().toString() }]);
-      toast({
-        title: "Escala adicionada",
-        description: "A nova escala foi adicionada com sucesso.",
-      });
+      const { error } = await supabase
+        .from('schedules')
+        .insert([{ ...scheduleData }]);
+
+      if (error) {
+        toast({ title: "Erro ao adicionar", description: error.message, variant: "destructive" });
+      } else {
+        await loadSchedules();
+        toast({ title: "Escala adicionada", description: "A nova escala foi adicionada com sucesso." });
+      }
     }
+
     setIsDialogOpen(false);
   };
 
@@ -125,7 +134,7 @@ const ScheduleModule = ({ currentUser, registeredUsers }) => {
         onSave={handleSaveSchedule}
         isEditMode={isEditMode}
         allSongs={allSongs}
-        allUsers={registeredUsers || []} 
+        allUsers={registeredUsers || []}
       />
     </div>
   );

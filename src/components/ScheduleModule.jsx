@@ -11,14 +11,16 @@ const ScheduleModule = ({ currentUser, registeredUsers }) => {
   const [schedules, setSchedules] = useState([]);
   const [allSongs, setAllSongs] = useState([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
+  // Não precisamos mais de isEditMode, o currentScheduleData já indica se é edição ou novo
+  // const [isEditMode, setIsEditMode] = useState(false);
   const [currentScheduleData, setCurrentScheduleData] = useState(null);
 
+  // Carrega escalas do Supabase
   const loadSchedules = useCallback(async () => {
     const { data, error } = await supabase
       .from('schedules')
       .select('*')
-      .order('date', { ascending: true });
+      .order('date', { ascending: true }); // Ordenar por data para exibir cronologicamente
 
     if (error) {
       toast({
@@ -27,16 +29,34 @@ const ScheduleModule = ({ currentUser, registeredUsers }) => {
         variant: 'destructive',
       });
     } else {
-      setSchedules(data || []);
+      // Converte a string de data do Supabase de volta para objeto Date
+      const parsedSchedules = data.map(schedule => ({
+        ...schedule,
+        date: new Date(schedule.date),
+        // Certifique-se que songs e participants são arrays/objetos se o Supabase retornar como JSONB
+        songs: schedule.songs || [],
+        participants: schedule.participants || { singers: [], instrumentalists: [] }
+      }));
+      setSchedules(parsedSchedules || []);
     }
   }, [toast]);
 
-  const loadSongs = useCallback(() => {
-    const savedSongs = localStorage.getItem('songs_v2');
-    if (savedSongs) {
-      setAllSongs(JSON.parse(savedSongs));
+  // Modificado: Carrega músicas do Supabase
+  const loadSongs = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('songs') // <--- MUDANÇA AQUI: Buscando da tabela 'songs' no Supabase
+      .select('id, title, artist'); // Selecione as colunas que você precisa para identificar a música
+
+    if (error) {
+      toast({
+        title: 'Erro ao carregar músicas',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      setAllSongs(data || []);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     loadSchedules();
@@ -48,7 +68,7 @@ const ScheduleModule = ({ currentUser, registeredUsers }) => {
       toast({ title: "Acesso Negado", description: "Apenas líderes podem criar escalas.", variant: "destructive" });
       return;
     }
-    setIsEditMode(false);
+    // Ao adicionar, currentScheduleData é null, o que indica ao ScheduleDialog para criar um novo
     setCurrentScheduleData(null);
     setIsDialogOpen(true);
   };
@@ -58,7 +78,7 @@ const ScheduleModule = ({ currentUser, registeredUsers }) => {
       toast({ title: "Acesso Negado", description: "Apenas líderes podem editar escalas.", variant: "destructive" });
       return;
     }
-    setIsEditMode(true);
+    // Passa o objeto schedule completo para edição
     setCurrentScheduleData(schedule);
     setIsDialogOpen(true);
   };
@@ -73,6 +93,7 @@ const ScheduleModule = ({ currentUser, registeredUsers }) => {
     if (error) {
       toast({ title: "Erro ao remover", description: error.message, variant: "destructive" });
     } else {
+      // Remover do estado local para atualização imediata
       setSchedules(schedules.filter(schedule => schedule.id !== id));
       toast({ title: "Escala removida", description: "A escala foi removida com sucesso." });
     }
@@ -81,32 +102,53 @@ const ScheduleModule = ({ currentUser, registeredUsers }) => {
   const handleSaveSchedule = async (scheduleData) => {
     if (currentUser?.type !== 'leader') return;
 
-    if (isEditMode) {
-      const { error } = await supabase
-        .from('schedules')
-        .update(scheduleData)
-        .eq('id', scheduleData.id);
+    // Prepara os dados para o Supabase
+    const dataToSave = {
+      date: scheduleData.date.toISOString(), // <-- IMPORTANTE: Converte Date para string ISO
+      songs: scheduleData.songs, // IDs das músicas
+      participants: scheduleData.participants // IDs dos participantes (JSONB)
+    };
 
-      if (error) {
-        toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
-      } else {
-        await loadSchedules();
+    try {
+      if (scheduleData.id && schedules.some(s => s.id === scheduleData.id)) {
+        // Modo de Edição: Se o ID existe e a escala já está na lista local
+        const { error, data: updatedData } = await supabase
+          .from('schedules')
+          .update(dataToSave) // Use dataToSave aqui
+          .eq('id', scheduleData.id)
+          .select(); // Adicione .select() para obter os dados atualizados
+
+        if (error) throw error;
+
+        // Atualiza o estado local com os dados retornados pelo Supabase
+        setSchedules(prevSchedules =>
+          prevSchedules.map(s => (s.id === updatedData[0].id ? { ...updatedData[0], date: new Date(updatedData[0].date) } : s))
+        );
         toast({ title: "Escala atualizada", description: "A escala foi atualizada com sucesso." });
-      }
-    } else {
-      const { error } = await supabase
-        .from('schedules')
-        .insert([{ ...scheduleData }]);
 
-      if (error) {
-        toast({ title: "Erro ao adicionar", description: error.message, variant: "destructive" });
       } else {
-        await loadSchedules();
+        // Modo de Criação: Novo agendamento
+        const { error, data: newData } = await supabase
+          .from('schedules')
+          .insert([dataToSave]) // Use dataToSave aqui
+          .select(); // Adicione .select() para obter os dados inseridos (incluindo o ID)
+
+        if (error) throw error;
+
+        // Adiciona a nova escala ao estado local
+        setSchedules(prevSchedules => [
+          ...prevSchedules,
+          { ...newData[0], date: new Date(newData[0].date) }
+        ]);
         toast({ title: "Escala adicionada", description: "A nova escala foi adicionada com sucesso." });
       }
+    } catch (error) {
+      console.error('Erro ao salvar escala:', error);
+      toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
+    } finally {
+      setIsDialogOpen(false);
+      setCurrentScheduleData(null); // Limpa o dado atual após salvar/atualizar
     }
-
-    setIsDialogOpen(false);
   };
 
   return (
@@ -125,16 +167,17 @@ const ScheduleModule = ({ currentUser, registeredUsers }) => {
         onEdit={handleEditSchedule}
         onDelete={handleDeleteSchedule}
         currentUser={currentUser}
+        registeredUsers={registeredUsers} // Certifique-se de passar registeredUsers para ScheduleList se ela precisar
       />
 
       <ScheduleDialog
         isOpen={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
+        onClose={() => { setIsDialogOpen(false); setCurrentScheduleData(null); }} // Zera currentScheduleData ao fechar
         schedule={currentScheduleData}
         onSave={handleSaveSchedule}
-        isEditMode={isEditMode}
+        // isEditMode não é mais necessário, a prop 'schedule' já indica se é edição
         allSongs={allSongs}
-        allUsers={registeredUsers || []}
+        allUsers={registeredUsers || []} // Passa os usuários registrados (do AuthContext)
       />
     </div>
   );

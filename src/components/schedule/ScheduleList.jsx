@@ -4,6 +4,8 @@ import { Calendar, Edit, Trash2, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
+// Certifique-se de que `schedules` já vem populado com objetos de música e nomes de usuários
+// e que `schedule.date` é um objeto Date.
 const ScheduleList = ({ schedules, onEdit, onDelete, currentUser }) => {
   if (!Array.isArray(schedules) || schedules.length === 0) {
     return (
@@ -35,10 +37,12 @@ const ScheduleList = ({ schedules, onEdit, onDelete, currentUser }) => {
                 <div className="flex justify-between items-start">
                   <div>
                     <CardTitle className="text-xl text-foreground">
+                      {/* Usar schedule.title que é gerado no ScheduleModule */}
                       {schedule.title}
                     </CardTitle>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {new Date(schedule.date + 'T00:00:00').toLocaleDateString('pt-BR', {
+                      {/* schedule.date já é um objeto Date aqui, não precisa mais de concatenação */}
+                      {schedule.date.toLocaleDateString('pt-BR', {
                         weekday: 'long',
                         year: 'numeric',
                         month: 'long',
@@ -70,20 +74,28 @@ const ScheduleList = ({ schedules, onEdit, onDelete, currentUser }) => {
               </CardHeader>
               <CardContent className="pt-4 px-4 pb-4">
                 <div className="mb-3">
+                  <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center">
+                    <Calendar className="h-4 w-4 mr-1.5" /> Músicas
+                  </h4>
                   <ul className="space-y-1.5">
-                    {schedule.songs.map((song, index) => (
-                      <li
-                        key={index}
-                        className="text-sm py-1.5 px-2 rounded bg-secondary/30 border border-border flex justify-between items-center"
-                      >
-                        <span>{song.title}</span>
-                        {song.key && (
-                          <span className="text-xs font-light text-purple-400 ml-2">
-                            ({song.key})
-                          </span>
-                        )}
-                      </li>
-                    ))}
+                    {/* schedule.songs agora contém objetos de música completos */}
+                    {schedule.songs.length === 0 ? (
+                      <li className="text-sm text-muted-foreground italic">Nenhuma música selecionada.</li>
+                    ) : (
+                      schedule.songs.map((song) => ( // Remova o index se não for usado
+                        <li
+                          key={song.id} // Use song.id como key
+                          className="text-sm py-1.5 px-2 rounded bg-secondary/30 border border-border flex justify-between items-center"
+                        >
+                          <span>{song.title}</span>
+                          {song.key && (
+                            <span className="text-xs font-light text-purple-400 ml-2">
+                              ({song.key})
+                            </span>
+                          )}
+                        </li>
+                      ))
+                    )}
                   </ul>
                 </div>
                 {schedule.participants && (
@@ -96,6 +108,7 @@ const ScheduleList = ({ schedules, onEdit, onDelete, currentUser }) => {
                         <div className="mb-1.5">
                           <p className="text-xs text-purple-400">Cantores:</p>
                           <p className="text-sm text-foreground">
+                            {/* schedule.participants.singers agora contém nomes */}
                             {schedule.participants.singers.join(', ')}
                           </p>
                         </div>
@@ -105,10 +118,15 @@ const ScheduleList = ({ schedules, onEdit, onDelete, currentUser }) => {
                         <div>
                           <p className="text-xs text-purple-400">Instrumentistas:</p>
                           <p className="text-sm text-foreground">
+                            {/* schedule.participants.instrumentalists agora contém nomes */}
                             {schedule.participants.instrumentalists.join(', ')}
                           </p>
                         </div>
                       )}
+                    {(schedule.participants.singers.length === 0 &&
+                      schedule.participants.instrumentalists.length === 0) && (
+                        <p className="text-sm text-muted-foreground italic">Nenhum participante selecionado.</p>
+                    )}
                   </div>
                 )}
               </CardContent>

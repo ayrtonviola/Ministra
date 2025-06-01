@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'; // Para o campo de tema
 import { Textarea } from '@/components/ui/textarea'; // Para o campo de notas
 import { Separator } from '@/components/ui/separator';
 import { Calendar } from '@/components/ui/calendar';
-import { ptBR } from 'date-fns/locale/pt-BR'; // CORREÇÃO JÁ FEITA POR VOCÊ E MANTIDA!
+import { ptBR } from 'date-fns/locale'
 import { format } from 'date-fns';
 
 const instrumentTypes = [

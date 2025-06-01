@@ -11,8 +11,6 @@ const ScheduleModule = ({ currentUser, registeredUsers }) => {
   const [schedules, setSchedules] = useState([]);
   const [allSongs, setAllSongs] = useState([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  // Não precisamos mais de isEditMode, o currentScheduleData já indica se é edição ou novo
-  // const [isEditMode, setIsEditMode] = useState(false);
   const [currentScheduleData, setCurrentScheduleData] = useState(null);
 
   // Carrega escalas do Supabase
@@ -20,7 +18,7 @@ const ScheduleModule = ({ currentUser, registeredUsers }) => {
     const { data, error } = await supabase
       .from('schedules')
       .select('*')
-      .order('date', { ascending: true }); // Ordenar por data para exibir cronologicamente
+      .order('scheduled_date', { ascending: true }); // <--- MUDANÇA AQUI: Ordenar por scheduled_date
 
     if (error) {
       toast({
@@ -30,22 +28,23 @@ const ScheduleModule = ({ currentUser, registeredUsers }) => {
       });
     } else {
       // Converte a string de data do Supabase de volta para objeto Date
+      // e mapeia os nomes das colunas do banco para os nomes usados no frontend
       const parsedSchedules = data.map(schedule => ({
         ...schedule,
-        date: new Date(schedule.date),
-        // Certifique-se que songs e participants são arrays/objetos se o Supabase retornar como JSONB
-        songs: schedule.songs || [],
-        participants: schedule.participants || { singers: [], instrumentalists: [] }
+        id: schedule.id, // Garante que o ID é mantido
+        date: new Date(schedule.scheduled_date), // <--- MUDANÇA AQUI: Mapeia scheduled_date para date
+        songs: schedule.songs_assigned || [], // <--- MUDANÇA AQUI: Mapeia songs_assigned para songs
+        participants: schedule.team_members || { singers: [], instrumentalists: [] } // <--- MUDANÇA AQUI: Mapeia team_members para participants
       }));
       setSchedules(parsedSchedules || []);
     }
   }, [toast]);
 
-  // Modificado: Carrega músicas do Supabase
+  // Carrega músicas do Supabase
   const loadSongs = useCallback(async () => {
     const { data, error } = await supabase
-      .from('songs') // <--- MUDANÇA AQUI: Buscando da tabela 'songs' no Supabase
-      .select('id, title, artist'); // Selecione as colunas que você precisa para identificar a música
+      .from('songs')
+      .select('id, title, artist');
 
     if (error) {
       toast({
@@ -68,7 +67,6 @@ const ScheduleModule = ({ currentUser, registeredUsers }) => {
       toast({ title: "Acesso Negado", description: "Apenas líderes podem criar escalas.", variant: "destructive" });
       return;
     }
-    // Ao adicionar, currentScheduleData é null, o que indica ao ScheduleDialog para criar um novo
     setCurrentScheduleData(null);
     setIsDialogOpen(true);
   };
@@ -78,7 +76,6 @@ const ScheduleModule = ({ currentUser, registeredUsers }) => {
       toast({ title: "Acesso Negado", description: "Apenas líderes podem editar escalas.", variant: "destructive" });
       return;
     }
-    // Passa o objeto schedule completo para edição
     setCurrentScheduleData(schedule);
     setIsDialogOpen(true);
   };
@@ -93,7 +90,6 @@ const ScheduleModule = ({ currentUser, registeredUsers }) => {
     if (error) {
       toast({ title: "Erro ao remover", description: error.message, variant: "destructive" });
     } else {
-      // Remover do estado local para atualização imediata
       setSchedules(schedules.filter(schedule => schedule.id !== id));
       toast({ title: "Escala removida", description: "A escala foi removida com sucesso." });
     }
@@ -102,43 +98,56 @@ const ScheduleModule = ({ currentUser, registeredUsers }) => {
   const handleSaveSchedule = async (scheduleData) => {
     if (currentUser?.type !== 'leader') return;
 
-    // Prepara os dados para o Supabase
+    // Prepara os dados para o Supabase, mapeando para os nomes das colunas do banco
     const dataToSave = {
-      date: scheduleData.date.toISOString(), // <-- IMPORTANTE: Converte Date para string ISO
-      songs: scheduleData.songs, // IDs das músicas
-      participants: scheduleData.participants // IDs dos participantes (JSONB)
+      scheduled_date: scheduleData.date.toISOString(), // <--- MUDANÇA AQUI: Mapeia date para scheduled_date
+      songs_assigned: scheduleData.songs, // <--- MUDANÇA AQUI: Mapeia songs para songs_assigned
+      team_members: scheduleData.participants, // <--- MUDANÇA AQUI: Mapeia participants para team_members
+      leader_id: currentUser.id, // Adiciona o ID do líder logado
+      theme: scheduleData.theme || null, // Adicione theme se você for usá-lo no frontend
+      notes: scheduleData.notes || null // Adicione notes se você for usá-lo no frontend
     };
 
     try {
-      if (scheduleData.id && schedules.some(s => s.id === scheduleData.id)) {
-        // Modo de Edição: Se o ID existe e a escala já está na lista local
+      if (scheduleData.id) { // Se o ID existe, é uma edição
         const { error, data: updatedData } = await supabase
           .from('schedules')
-          .update(dataToSave) // Use dataToSave aqui
+          .update(dataToSave)
           .eq('id', scheduleData.id)
-          .select(); // Adicione .select() para obter os dados atualizados
+          .select();
 
         if (error) throw error;
 
-        // Atualiza o estado local com os dados retornados pelo Supabase
         setSchedules(prevSchedules =>
-          prevSchedules.map(s => (s.id === updatedData[0].id ? { ...updatedData[0], date: new Date(updatedData[0].date) } : s))
+          prevSchedules.map(s =>
+            s.id === updatedData[0].id
+              ? {
+                  ...updatedData[0],
+                  date: new Date(updatedData[0].scheduled_date), // Converte data de volta
+                  songs: updatedData[0].songs_assigned || [],
+                  participants: updatedData[0].team_members || { singers: [], instrumentalists: [] }
+                }
+              : s
+          )
         );
         toast({ title: "Escala atualizada", description: "A escala foi atualizada com sucesso." });
 
-      } else {
-        // Modo de Criação: Novo agendamento
+      } else { // Caso contrário, é uma criação
         const { error, data: newData } = await supabase
           .from('schedules')
-          .insert([dataToSave]) // Use dataToSave aqui
-          .select(); // Adicione .select() para obter os dados inseridos (incluindo o ID)
+          .insert([dataToSave])
+          .select();
 
         if (error) throw error;
 
-        // Adiciona a nova escala ao estado local
         setSchedules(prevSchedules => [
           ...prevSchedules,
-          { ...newData[0], date: new Date(newData[0].date) }
+          {
+            ...newData[0],
+            date: new Date(newData[0].scheduled_date), // Converte data de volta
+            songs: newData[0].songs_assigned || [],
+            participants: newData[0].team_members || { singers: [], instrumentalists: [] }
+          }
         ]);
         toast({ title: "Escala adicionada", description: "A nova escala foi adicionada com sucesso." });
       }
@@ -147,7 +156,7 @@ const ScheduleModule = ({ currentUser, registeredUsers }) => {
       toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
     } finally {
       setIsDialogOpen(false);
-      setCurrentScheduleData(null); // Limpa o dado atual após salvar/atualizar
+      setCurrentScheduleData(null);
     }
   };
 
@@ -167,17 +176,16 @@ const ScheduleModule = ({ currentUser, registeredUsers }) => {
         onEdit={handleEditSchedule}
         onDelete={handleDeleteSchedule}
         currentUser={currentUser}
-        registeredUsers={registeredUsers} // Certifique-se de passar registeredUsers para ScheduleList se ela precisar
+        registeredUsers={registeredUsers}
       />
 
       <ScheduleDialog
         isOpen={isDialogOpen}
-        onClose={() => { setIsDialogOpen(false); setCurrentScheduleData(null); }} // Zera currentScheduleData ao fechar
+        onClose={() => { setIsDialogOpen(false); setCurrentScheduleData(null); }}
         schedule={currentScheduleData}
         onSave={handleSaveSchedule}
-        // isEditMode não é mais necessário, a prop 'schedule' já indica se é edição
         allSongs={allSongs}
-        allUsers={registeredUsers || []} // Passa os usuários registrados (do AuthContext)
+        allUsers={registeredUsers || []}
       />
     </div>
   );
